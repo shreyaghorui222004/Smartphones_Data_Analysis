@@ -172,16 +172,6 @@ with tab4:
 
 with tab5:
     st.header("Outlier Detection")
-    if 'rating' in filtered_df.columns:
-        Q1_rating = filtered_df['rating'].quantile(0.25)
-        Q3_rating = filtered_df['rating'].quantile(0.75)
-        IQR_rating = Q3_rating - Q1_rating
-        outliers_rating = filtered_df[(filtered_df['rating'] < (Q1_rating - 1.5 * IQR_rating)) | (filtered_df['rating'] > (Q3_rating + 1.5 * IQR_rating))]
-        st.subheader("Outliers in Rating")
-        st.dataframe(outliers_rating[['model', 'rating', 'brand', 'price_numeric'] if 'brand' in outliers_rating.columns else ['model', 'rating']])
-        fig_outlier_rating = px.box(filtered_df, y='rating', title="Box Plot of Ratings (Outliers Highlighted)", color_discrete_sequence=['#FF6384'])
-        st.plotly_chart(fig_outlier_rating)
-        st.markdown("**Description**: This box plot highlights rating outliers with a pink color, showing the interquartile range and extreme values.")
     if 'price_numeric' in filtered_df.columns:
         Q1_price = filtered_df['price_numeric'].quantile(0.25)
         Q3_price = filtered_df['price_numeric'].quantile(0.75)
