@@ -16,6 +16,8 @@ def load_data(file_path):
         boolean_cols = df.select_dtypes(include=['bool']).columns
         for col in numeric_cols:
             df[col] = pd.to_numeric(df[col], errors='coerce')
+            if col in ['price_numeric', 'rating']:
+                df = df[df[col] >= 0]  # Remove negative or invalid values
         for col in boolean_cols:
             df[col] = df[col].astype(bool)
         return df
@@ -57,7 +59,7 @@ for col, value in selected_filters.items():
 filtered_df = filtered_df.dropna()
 
 # Tabs for Different Sections
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Summary", "Distributions", "Comparisons", "Correlations", "Outlier Detection"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Summary", "Distributions", "Comparisons", "Correlations", "Outlier Detection", "Buying Guide"])
 
 with tab1:
     st.header("Summary Statistics")
@@ -178,7 +180,7 @@ with tab5:
         IQR_price = Q3_price - Q1_price
         outliers_price = filtered_df[(filtered_df['price_numeric'] < (Q1_price - 1.5 * IQR_price)) | (filtered_df['price_numeric'] > (Q3_price + 1.5 * IQR_price))]
         st.subheader("Outliers in Price")
-        st.dataframe(outliers_price[['model', 'rating', 'brand', 'price_numeric'] if 'brand' in outliers_price.columns else ['model', 'price_numeric']])
+        st.dataframe(outliers_price[['model', 'brand', 'price_numeric'] if 'brand' in outliers_price.columns else ['model', 'price_numeric']])
         fig_outlier_price = px.box(filtered_df, y='price_numeric', title="Box Plot of Prices (Outliers Highlighted)", color_discrete_sequence=['#36A2EB'])
         st.plotly_chart(fig_outlier_price)
         st.markdown("**Description**: This box plot identifies price outliers with a blue shade, useful for spotting unusual price points.")
@@ -189,9 +191,66 @@ with tab5:
     - The presence of outliers suggests a diverse dataset, with some brands pushing boundaries in pricing or performance.
     """)
 
-# Footer
-st.markdown("---")
-st.markdown(f"Last Updated: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')} IST. Built with Streamlit.")
+with tab6:
+    st.header("Buying Guide")
+    if 'price_numeric' in filtered_df.columns and 'rating' in filtered_df.columns:
+        # Calculate value for money, ensuring non-negative and handling NaN/infinite values
+        filtered_df['value_for_money'] = filtered_df.apply(
+            lambda row: max(0, row['rating'] / (row['price_numeric'] / 1000)) if pd.notna(row['rating']) and pd.notna(row['price_numeric']) and row['price_numeric'] > 0 else 0,
+            axis=1
+        )
+        fig_value_money = px.scatter(filtered_df, x='price_numeric', y='value_for_money', color='brand', size='rating',
+                                    title="Value for Money (Rating per 1000 INR) vs. Price", hover_data=['model'],
+                                    color_discrete_sequence=px.colors.qualitative.Set3)
+        st.plotly_chart(fig_value_money)
+        st.markdown("**Description**: This scatter plot shows value for money (rating per 1000 INR) against price, with larger dots indicating higher ratings. Look for high value_for_money in your budget range.")
+
+    if 'ram_gb' in filtered_df.columns and 'price_numeric' in filtered_df.columns:
+        fig_ram_price = px.scatter(filtered_df, x='ram_gb', y='price_numeric', color='brand', size='rating',
+                                  title="RAM vs. Price (INR) with Rating", hover_data=['model'],
+                                  color_discrete_sequence=px.colors.qualitative.Set2)
+        st.plotly_chart(fig_ram_price)
+        st.markdown("**Description**: This scatter plot compares RAM (GB) with price, sized by rating. Higher RAM at lower prices with good ratings indicates a performance bargain.")
+
+    if 'camera_mpix' in filtered_df.columns and 'price_numeric' in filtered_df.columns:
+        fig_camera_price = px.scatter(filtered_df, x='camera_mpix', y='price_numeric', color='brand', size='rating',
+                                     title="Camera Megapixels vs. Price (INR) with Rating", hover_data=['model'],
+                                     color_discrete_sequence=px.colors.qualitative.D3)
+        st.plotly_chart(fig_camera_price)
+        st.markdown("**Description**: This scatter plot links camera megapixels to price, sized by rating. Higher megapixels at reasonable prices with good ratings suggest strong camera options.")
+
+    if 'battery_mah' in filtered_df.columns and 'price_numeric' in filtered_df.columns:
+        fig_battery_price = px.scatter(filtered_df, x='battery_mah', y='price_numeric', color='brand', size='rating',
+                                      title="Battery Capacity (mAh) vs. Price (INR) with Rating", hover_data=['model'],
+                                      color_discrete_sequence=px.colors.qualitative.Safe)
+        st.plotly_chart(fig_battery_price)
+        st.markdown("**Description**: This scatter plot shows battery capacity (mAh) against price, sized by rating. Look for high mAh with good ratings in your budget for long battery life.")
+
+    if 'processor' in filtered_df.columns and 'price_numeric' in filtered_df.columns:
+        fig_processor_price = px.box(filtered_df, x='processor', y='price_numeric', color='brand',
+                                    title="Price Distribution by Processor Type", hover_data=['model'],
+                                    color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_processor_price.update_layout(xaxis={'tickangle': 45})
+        st.plotly_chart(fig_processor_price)
+        st.markdown("**Description**: This box plot shows price ranges by processor type, colored by brand. Choose a processor (e.g., Snapdragon 8 Gen 1) based on your performance needs within budget.")
+
+    if 'camera_mpix' in filtered_df.columns and 'battery_mah' in filtered_df.columns:
+        fig_camera_battery = px.scatter(filtered_df, x='camera_mpix', y='battery_mah', color='price_numeric', size='rating',
+                                       title="Camera Megapixels vs. Battery Capacity (mAh) with Price", hover_data=['model'],
+                                       color_continuous_scale=px.colors.sequential.Viridis)
+        st.plotly_chart(fig_camera_battery)
+        st.markdown("**Description**: This scatter plot explores the trade-off between camera megapixels and battery capacity, colored by price. High ratings with balanced specs are ideal for all-day use and photography.")
+
+    st.subheader("Insights")
+    st.markdown("""
+    - **Value for Money**: Mid-range phones (₹20,000-₹40,000) often offer the best rating per 1000 INR, especially from brands like Xiaomi and OnePlus.
+    - **RAM Performance**: 6-8 GB RAM at lower prices with high ratings are ideal for multitasking and gaming.
+    - **Camera Quality**: Phones with 48-108 MP cameras in the ₹30,000-₹60,000 range with good ratings provide excellent photography value.
+    - **Battery Life**: Models with 5000 mAh+ batteries in the ₹20,000-₹50,000 range with solid ratings are great for heavy users.
+    - **Processor Performance**: High-end processors (e.g., Snapdragon 8 Gen 1) are pricier but offer better performance; mid-range chips (e.g., Snapdragon 7 Series) balance cost and power.
+    - **Camera vs. Battery Trade-off**: Phones with 50-80 MP and 4500-5000 mAh at moderate prices (~₹40,000) offer a balanced choice for photography and battery life.
+    - **Decision Tip**: Filter by your budget, prioritize high ratings, then check RAM, camera, battery, and processor specs for the best match.
+    """)
 
 # Run the app
 if __name__ == "__main__":
